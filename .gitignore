@@ -1,0 +1,4 @@
+.hermes/
+.DS_Store
+__pycache__/
+test-results*.png
