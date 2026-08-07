@@ -3,7 +3,7 @@ import re,subprocess,sys,time
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1];server=subprocess.Popen([sys.executable,'-m','http.server','8766'],cwd=ROOT,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-EXPECTED={'':5,'editions/2026-07-17/':4,'editions/2026-07-24/':6,'editions/2026-07-31/':6,'editions/2026-08-07/':5}
+EXPECTED={'':6,'editions/2026-07-17/':4,'editions/2026-07-24/':6,'editions/2026-07-31/':6,'editions/2026-08-07/':6}
 try:
  time.sleep(1)
  with sync_playwright() as p:
@@ -19,5 +19,5 @@ try:
    if path=='':page.screenshot(path=str(ROOT/'test-results-desktop.png'),full_page=True)
    page.close()
   mob=b.new_page(viewport={'width':390,'height':844});mob.goto('http://127.0.0.1:8766',wait_until='networkidle');mob.wait_for_function("document.documentElement.dataset.ready === 'true'");assert mob.evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth');mob.screenshot(path=str(ROOT/'test-results-mobile.png'),full_page=True);mob.close();b.close();assert not errors,errors
- print('Republik UI smoke passed: 4 editions, 21 direct links, durations, privacy, desktop/mobile')
+ print('Republik UI smoke passed: 4 editions, 23 direct links, durations, privacy, desktop/mobile')
 finally:server.terminate();server.wait(timeout=5)
