@@ -14,12 +14,13 @@ EXPECTED_TITLES = {
     "2026-07-24": ["Reise ins Wunderland", "Ein Medienminister auf Mission", "Gigantische Zukunft", "Wasserknappheit im Wilden Westen", "Was Trumps Zölle bisher bewirkten", "Madre mia!"],
     "2026-07-17": ["Klartext aus der Fussballkabine", "Chinas stille Revolution", "Mensch gegen Maschine", "Schaut auf die Haut!"],
 }
-assert manifest["latest"] == "2026-08-21"
+EXPECTED_TITLES = json.loads((ROOT / 'tests/expected_titles.json').read_text())
+assert manifest["latest"] == "2026-09-18"
 assert [e["end"] for e in manifest["editions"]] == list(EXPECTED_TITLES)
 assert all(e["count"] == len(EXPECTED_TITLES[e["end"]]) for e in manifest["editions"])
-assert sum(e["count"] for e in manifest["editions"]) == 33
+assert sum(e["count"] for e in manifest["editions"]) == 56
 
-paths = [("", "2026-08-21")] + [(e["href"], e["end"]) for e in manifest["editions"]]
+paths = [("", manifest['latest'])] + [(e["href"], e["end"]) for e in manifest["editions"]]
 # Root and the latest archive intentionally render the same edition.
 server = subprocess.Popen([sys.executable, "-m", "http.server", "8766"], cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 try:
@@ -61,7 +62,7 @@ try:
                 page.close()
         browser.close()
         assert not errors, errors
-    print("Republik UI smoke passed: 6 editions, 33 cards, 33 clean direct links, hostname/duration visibility, privacy, console, desktop/mobile overflow")
+    print("Republik UI smoke passed: 10 editions, 56 cards, clean direct links, hostname/duration visibility, privacy, console, desktop/mobile overflow")
 finally:
     server.terminate()
     server.wait(timeout=5)
