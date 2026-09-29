@@ -15,10 +15,10 @@ EXPECTED_TITLES = {
     "2026-07-17": ["Klartext aus der Fussballkabine", "Chinas stille Revolution", "Mensch gegen Maschine", "Schaut auf die Haut!"],
 }
 EXPECTED_TITLES = json.loads((ROOT / 'tests/expected_titles.json').read_text())
-assert manifest["latest"] == "2026-09-18"
+assert manifest["latest"] == "2026-10-02"
 assert [e["end"] for e in manifest["editions"]] == list(EXPECTED_TITLES)
 assert all(e["count"] == len(EXPECTED_TITLES[e["end"]]) for e in manifest["editions"])
-assert sum(e["count"] for e in manifest["editions"]) == 56
+assert sum(e["count"] for e in manifest["editions"]) == 65
 
 paths = [("", manifest['latest'])] + [(e["href"], e["end"]) for e in manifest["editions"]]
 # Root and the latest archive intentionally render the same edition.
@@ -62,7 +62,7 @@ try:
                 page.close()
         browser.close()
         assert not errors, errors
-    print("Republik UI smoke passed: 10 editions, 56 cards, clean direct links, hostname/duration visibility, privacy, console, desktop/mobile overflow")
+    print("Republik UI smoke passed: 13 editions, 65 cards, clean direct links, hostname/duration visibility, privacy, console, desktop/mobile overflow")
 finally:
     server.terminate()
     server.wait(timeout=5)
