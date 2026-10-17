@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-import json, re, subprocess, sys, time
+import json, os, re, threading
+from functools import partial
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 from playwright.sync_api import sync_playwright
@@ -15,16 +17,24 @@ EXPECTED_TITLES = {
     "2026-07-17": ["Klartext aus der Fussballkabine", "Chinas stille Revolution", "Mensch gegen Maschine", "Schaut auf die Haut!"],
 }
 EXPECTED_TITLES = json.loads((ROOT / 'tests/expected_titles.json').read_text())
-assert manifest["latest"] == "2026-10-02"
+assert manifest["latest"] == "2026-10-16"
 assert [e["end"] for e in manifest["editions"]] == list(EXPECTED_TITLES)
 assert all(e["count"] == len(EXPECTED_TITLES[e["end"]]) for e in manifest["editions"])
-assert sum(e["count"] for e in manifest["editions"]) == 65
+assert sum(e["count"] for e in manifest["editions"]) == 81
 
 paths = [("", manifest['latest'])] + [(e["href"], e["end"]) for e in manifest["editions"]]
 # Root and the latest archive intentionally render the same edition.
-server = subprocess.Popen([sys.executable, "-m", "http.server", "8766"], cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+class QuietHandler(SimpleHTTPRequestHandler):
+    def log_message(self, format, *args):
+        pass
+
+server = None
+base_url = os.environ.get('BASE_URL')
+if not base_url:
+    server = ThreadingHTTPServer(('127.0.0.1', 0), partial(QuietHandler, directory=str(ROOT)))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    base_url = f'http://127.0.0.1:{server.server_port}/'
 try:
-    time.sleep(1)
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         errors = []
@@ -33,8 +43,9 @@ try:
                 page = browser.new_page(viewport={"width": width, "height": height})
                 page.on("console", lambda msg, path=path: errors.append(f"{path}: {msg.text}") if msg.type == "error" else None)
                 page.on("pageerror", lambda exc, path=path: errors.append(f"{path}: {exc}"))
-                page.goto("http://127.0.0.1:8766/" + path, wait_until="networkidle")
-                page.wait_for_function("document.documentElement.dataset.ready === 'true'")
+                response = page.goto(base_url.rstrip('/') + '/' + path, wait_until="networkidle")
+                assert response is not None and response.status == 200, path
+                page.wait_for_function("() => document.documentElement.dataset.ready === 'true'")
                 cards = page.locator(".item-card")
                 expected = EXPECTED_TITLES[edition]
                 assert cards.count() == len(expected), (path, cards.count(), len(expected))
@@ -50,11 +61,24 @@ try:
                     assert not url.query and not url.fragment and not url.username and not url.password
                     text = card.inner_text()
                     display_host = (url.hostname or "").removeprefix("www.")
-                    assert display_host in text and re.search(r"≈ \d+ Min\. Lesezeit", text)
+                    assert display_host in text and (re.search(r"≈ \d+ Min\. Lesezeit", text) or "Lesezeit nicht angegeben" in text)
                 body = page.locator("body").inner_text()
                 assert not re.search(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", body)
                 assert not any(secret in body for secret in ("/home/", "messageId", "Label_", "icloud.com", "Guten Morgen Armin"))
                 assert page.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth")
+                for button in page.locator('[data-filter]').all():
+                    kind = button.get_attribute('data-filter')
+                    button.click()
+                    expected_visible = len(expected) if kind == 'all' else page.locator(f'.item-card[data-type="{kind}"]').count()
+                    assert page.locator('.item-card:visible').count() == expected_visible
+                    assert button.get_attribute('aria-pressed') == 'true'
+                    assert page.locator('#result-count').inner_text().startswith(str(expected_visible) + ' ')
+                page.locator('[data-filter="all"]').click()
+                for tab in page.locator('.edition-inner a').all():
+                    href = tab.get_attribute('href')
+                    assert href is not None
+                    destination = urlsplit(href).path
+                    assert (ROOT / path / destination / 'index.html').resolve().is_file()
                 if path == "" and width == 1440:
                     page.screenshot(path=str(ROOT / "test-results-desktop.png"), full_page=True)
                 if path == "" and width == 390:
@@ -62,7 +86,8 @@ try:
                 page.close()
         browser.close()
         assert not errors, errors
-    print("Republik UI smoke passed: 13 editions, 65 cards, clean direct links, hostname/duration visibility, privacy, console, desktop/mobile overflow")
+    print("Republik UI smoke passed: 15 editions, 81 cards, clean direct links, hostname/duration visibility, privacy, console, desktop/mobile overflow")
 finally:
-    server.terminate()
-    server.wait(timeout=5)
+    if server:
+        server.shutdown()
+        server.server_close()
