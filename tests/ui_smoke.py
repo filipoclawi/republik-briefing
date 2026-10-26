@@ -17,10 +17,15 @@ EXPECTED_TITLES = {
     "2026-07-17": ["Klartext aus der Fussballkabine", "Chinas stille Revolution", "Mensch gegen Maschine", "Schaut auf die Haut!"],
 }
 EXPECTED_TITLES = json.loads((ROOT / 'tests/expected_titles.json').read_text())
-assert manifest["latest"] == "2026-10-16"
+assert manifest["latest"] == "2026-10-30"
+assert manifest['editions'][0]['status'] == 'partial'
+assert manifest['editions'][0]['sourceCount'] == 2
+assert manifest['editions'][0]['asOf'] == '2026-10-26T13:04:00+01:00'
+assert manifest['editions'][1]['status'] == 'complete'
+assert manifest['editions'][1]['sourceCount'] == 6
 assert [e["end"] for e in manifest["editions"]] == list(EXPECTED_TITLES)
 assert all(e["count"] == len(EXPECTED_TITLES[e["end"]]) for e in manifest["editions"])
-assert sum(e["count"] for e in manifest["editions"]) == 81
+assert sum(e["count"] for e in manifest["editions"]) == 89
 
 paths = [("", manifest['latest'])] + [(e["href"], e["end"]) for e in manifest["editions"]]
 # Root and the latest archive intentionally render the same edition.
@@ -63,8 +68,16 @@ try:
                     display_host = (url.hostname or "").removeprefix("www.")
                     assert display_host in text and (re.search(r"≈ \d+ Min\. Lesezeit", text) or "Lesezeit nicht angegeben" in text)
                 body = page.locator("body").inner_text()
+                if edition == '2026-10-30':
+                    assert 'Zwischenstand' in body and '26.10.2026, 13:04 Uhr' in body
+                    assert 'bis Freitag, 30.10.2026' in body
+                if edition in ('2026-10-23', '2026-10-30'):
+                    assert page.locator('.source-note').count() == len(expected)
+                    assert all('Auf Grundlage des Newsletters' in s for s in page.locator('.source-note').all_text_contents())
+                    assert page.locator('.item-card[id^="beitrag-"]').count() == len(expected)
+                    assert 'Lesezeit nicht angegeben' in body
                 assert not re.search(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", body)
-                assert not any(secret in body for secret in ("/home/", "messageId", "Label_", "icloud.com", "Guten Morgen Armin"))
+                assert not any(secret in body for secret in ("/home/", "messageId", "Label_", "icloud.com", "Guten Morgen "))
                 assert page.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth")
                 for button in page.locator('[data-filter]').all():
                     kind = button.get_attribute('data-filter')
@@ -79,6 +92,16 @@ try:
                     assert href is not None
                     destination = urlsplit(href).path
                     assert (ROOT / path / destination / 'index.html').resolve().is_file()
+                # Exercise real navigation, not just local path existence.
+                tab = page.locator('.edition-inner a').first
+                target_edition = tab.inner_text().split(' · ')[0]
+                tab.click()
+                page.wait_for_load_state('networkidle')
+                page.wait_for_function("() => document.documentElement.dataset.ready === 'true'")
+                assert page.locator('h3').all_text_contents() == EXPECTED_TITLES[target_edition]
+                page.go_back(wait_until='networkidle')
+                page.wait_for_function("() => document.documentElement.dataset.ready === 'true'")
+                assert page.locator('h3').all_text_contents() == expected
                 if path == "" and width == 1440:
                     page.screenshot(path=str(ROOT / "test-results-desktop.png"), full_page=True)
                 if path == "" and width == 390:
@@ -86,7 +109,7 @@ try:
                 page.close()
         browser.close()
         assert not errors, errors
-    print("Republik UI smoke passed: 15 editions, 81 cards, clean direct links, hostname/duration visibility, privacy, console, desktop/mobile overflow")
+    print(f"Republik UI smoke passed: {len(manifest['editions'])} editions, {sum(e['count'] for e in manifest['editions'])} cards, clean direct links, hostname/duration visibility, partial cutoff, privacy, console, desktop/mobile overflow and navigation")
 finally:
     if server:
         server.shutdown()
