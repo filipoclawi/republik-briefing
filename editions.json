@@ -4,11 +4,11 @@
     {
       "start": "2026-10-24",
       "end": "2026-10-30",
-      "count": 2,
+      "count": 6,
       "href": "editions/2026-10-30/",
-      "status": "partial",
-      "sourceCount": 2,
-      "asOf": "2026-10-26T13:04:00+01:00"
+      "status": "complete",
+      "sourceCount": 6,
+      "asOf": "2026-10-30T22:42:50+01:00"
     },
     {
       "start": "2026-10-17",

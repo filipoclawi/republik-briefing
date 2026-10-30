@@ -18,14 +18,14 @@ EXPECTED_TITLES = {
 }
 EXPECTED_TITLES = json.loads((ROOT / 'tests/expected_titles.json').read_text())
 assert manifest["latest"] == "2026-10-30"
-assert manifest['editions'][0]['status'] == 'partial'
-assert manifest['editions'][0]['sourceCount'] == 2
-assert manifest['editions'][0]['asOf'] == '2026-10-26T13:04:00+01:00'
+assert manifest['editions'][0]['status'] == 'complete'
+assert manifest['editions'][0]['sourceCount'] == 6
+assert manifest['editions'][0]['asOf'].startswith('2026-10-30T')
 assert manifest['editions'][1]['status'] == 'complete'
 assert manifest['editions'][1]['sourceCount'] == 6
 assert [e["end"] for e in manifest["editions"]] == list(EXPECTED_TITLES)
 assert all(e["count"] == len(EXPECTED_TITLES[e["end"]]) for e in manifest["editions"])
-assert sum(e["count"] for e in manifest["editions"]) == 89
+assert sum(e["count"] for e in manifest["editions"]) == 93
 
 paths = [("", manifest['latest'])] + [(e["href"], e["end"]) for e in manifest["editions"]]
 # Root and the latest archive intentionally render the same edition.
@@ -69,8 +69,8 @@ try:
                     assert display_host in text and (re.search(r"≈ \d+ Min\. Lesezeit", text) or "Lesezeit nicht angegeben" in text)
                 body = page.locator("body").inner_text()
                 if edition == '2026-10-30':
-                    assert 'Zwischenstand' in body and '26.10.2026, 13:04 Uhr' in body
-                    assert 'bis Freitag, 30.10.2026' in body
+                    assert 'Zwischenstand' not in body and 'Redaktionsschluss:' in body
+                    assert '6 Newsletter vom 24. bis 30. Oktober' in body
                 if edition in ('2026-10-23', '2026-10-30'):
                     assert page.locator('.source-note').count() == len(expected)
                     assert all('Auf Grundlage des Newsletters' in s for s in page.locator('.source-note').all_text_contents())
@@ -109,7 +109,7 @@ try:
                 page.close()
         browser.close()
         assert not errors, errors
-    print(f"Republik UI smoke passed: {len(manifest['editions'])} editions, {sum(e['count'] for e in manifest['editions'])} cards, clean direct links, hostname/duration visibility, partial cutoff, privacy, console, desktop/mobile overflow and navigation")
+    print(f"Republik UI smoke passed: {len(manifest['editions'])} editions, {sum(e['count'] for e in manifest['editions'])} cards, clean direct links, hostname/duration visibility, editorial cutoff, privacy, console, desktop/mobile overflow and navigation")
 finally:
     if server:
         server.shutdown()
